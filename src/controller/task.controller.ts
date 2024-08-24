@@ -1,6 +1,8 @@
 import {Request, Response} from 'express';
-import Project, { ITask } from "../models/project.model";
+import Project from "../models/project.model";
+import Task, { ITask } from "../models/task.model";
 import jwt, { Secret, JwtPayload } from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 
 export const createTask = async (req: Request, res: Response) => {
@@ -17,22 +19,99 @@ export const createTask = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "Project not found" });
         }
 
-        await project.updateOne({ $push: { tasks: { name, description, status, creationDate } } });
+        if (project.user.toString() !== token.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
 
-        res.status(200).json({ message: "Task created successfully" });
+        const task = new Task({ name, description, status, creationDate, user: token.id, project: projectId });
+        await task.save().then((task: ITask) => {
+            return res.status(200).json({ message: "Task created successfully", task });
+        });
+
+        // res.status(200).json({ message: "Internal server error" });
+
+        // res.status(200).json({ message: "Task created successfully" });
+
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: "Internal server error" });
     }
 }
 
-export const getUserTasks = async (req: Request, res: Response) => {
+export const updateTask = async (req: Request, res: Response) => {
+    const { id, name, description, creationDate, status } = req.body;
+    const token = (req as any).token as JwtPayload;
+
+    if (!id) {
+        return res.status(400).json({ message: "Task id is required" });
+    }
+
+    const fieldsToUpdate: any = {};
+
+    if (name) {
+        fieldsToUpdate.name = name;
+    }
+
+    if (description) {
+        fieldsToUpdate.description = description;
+    }
+
+    if (status) {
+        fieldsToUpdate.status = status;
+    }
+
+    if (creationDate) {
+        fieldsToUpdate.creationDate = creationDate;
+    }
+
+    try {
+        const task = await Task.findById(id);
+        if (!task) {
+            return res.status(404).json({ message: "Task not found" });
+        }
+
+        if (task.user.toString() !== token.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        await Task.findByIdAndUpdate(id, fieldsToUpdate);
+        
+        res.status(200).json({ message: "Task updated successfully" });
+
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const deleteTask = async (req: Request, res: Response) => {
+    const { id } = req.body;
     const token = (req as any).token as JwtPayload;
 
     try {
-        const projects = await Project.find({ user: token.id });
-        const tasks = projects.map(project => project.tasks);
+        const task = await Task.findById(id);
+        if (!task) {
+            return res.status(404).json({ message: "Task not found" });
+        }
+
+        if (task.user.toString() !== token.id) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        await Task.findByIdAndDelete(id);
+        res.status(200).json({ message: "Task deleted successfully" });
+
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const getTasks = async (req: Request, res: Response) => {
+    try {
+        const token = (req as any).token as JwtPayload;
+
+        const tasks = await Task.find({ user: token.id });
         res.status(200).json(tasks);
+
     } catch (error) {
         res.status(500).json({ message: "Internal server error" });
     }
@@ -44,41 +123,45 @@ export const filterTasks = async (req: Request, res: Response) => {
         const { status, startDate, endDate, id, page, limit } = req.query;
         const token = (req as any).token as JwtPayload;
 
-        const query: any = { user: token.id };
-
-        const pageNumber = parseInt(page as string) || 1;
-        const size = parseInt(limit as string) || 10;
-
-        let projects = await Project.find({ user: token.id });
-        if (id) {
-            projects = projects.filter(project => project._id == id);
-        }
-
-        let tasks = projects.map(project => project.tasks)[0];
-
+        const query: any = { user: mongoose.Types.ObjectId.createFromHexString(token.id) };
 
         if (status) {
-            tasks = tasks.filter(task => task.status == status);
+            query.status = status;
         }
 
         if (startDate && endDate) {
-            tasks = tasks.filter(task => new Date(task.creationDate) >= new Date(startDate as string) && new Date(task.creationDate) <= new Date(endDate as string));
+            query.creationDate = { $gte: new Date(startDate as string), $lte: new Date(endDate as string) };
         } else if (startDate) {
-            tasks = tasks.filter(task => new Date(task.creationDate) >= new Date(startDate as string));
+            query.creationDate = { $gte: new Date(startDate as string) };
         } else if (endDate) {
-            tasks = tasks.filter(task => new Date(task.creationDate) <= new Date(endDate as string));
+            query.creationDate = { $lte: new Date(endDate as string) };
         }
 
-        const totalPages = Math.ceil(tasks.length / size);
-        const start = (pageNumber - 1) * size;
+        if (id) {
+            query.project = mongoose.Types.ObjectId.createFromHexString(id as string);
+        }
 
-        tasks = tasks.slice(start, start + size);
+        let tasks = await Task.aggregate([
+            {
+                $match: query
+            }
+        ]);
 
+        let pageNumber: number = 1;
+        let totalPages: number = 1;
+
+        if (page && limit) {
+            pageNumber = parseInt(page as string) || 1;
+            const size = parseInt(limit as string) || 10;
+            totalPages = Math.ceil(tasks.length / size);
+
+            tasks = await Task.find(query).skip((pageNumber - 1) * size).limit(size);    
+        }
 
         res.status(200).json({
             tasks,
-            totalPages,
-            currentPage: pageNumber
+            currentPage: pageNumber,
+            totalPages: totalPages
         });
 
     } catch (error) {

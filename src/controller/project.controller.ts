@@ -1,6 +1,8 @@
 import {Request, Response} from 'express';
-import Project from "../models/project.model";
+import Project, { IProject } from "../models/project.model";
+import Task from "../models/task.model";
 import jwt, { Secret, JwtPayload } from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 export const createProject = async (req: Request, res: Response) => {
     const { name } = req.body;
@@ -12,9 +14,12 @@ export const createProject = async (req: Request, res: Response) => {
 
     try {
         const project = new Project({ name, user: token.id });
-        await project.save();
+        await project.save().then((project : IProject) => {
+            return res.status(200).json({ message: "Project created successfully", project });
+        });
 
-        res.status(200).json({ message: "Project created successfully" });
+        // res.status(200).json({ message: "Internal server error" });
+        
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: "Internal server error" });
@@ -25,8 +30,24 @@ export const getProjects = async (req: Request, res: Response) => {
     const token = (req as any).token as JwtPayload;
 
     try {
-        const projects = await Project.find({ user: token.id });
+
+        let projects = await Project.aggregate([
+            {
+                $match: { user: mongoose.Types.ObjectId.createFromHexString(token.id) }
+            },
+            {
+                $lookup: {
+                    from: "tasks",
+                    localField: "_id",
+                    foreignField: "project",
+                    as: "tasks"
+                }
+            }
+        ]).exec()
+        console.log(projects);
+
         res.status(200).json(projects);
+
     } catch (error) {
         res.status(500).json({ message: "Internal server error" });
     }
@@ -36,12 +57,21 @@ export const getProject = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
-        const project = await Project.findById(id);
-        if (!project) {
-            return res.status(404).json({ message: "Project not found" });
-        }
+        const project = await Project.aggregate([
+            {
+                $match: { _id: mongoose.Types.ObjectId.createFromHexString(id) }
+            },
+            {
+                $lookup: {
+                    from: "tasks",
+                    localField: "_id",
+                    foreignField: "project",
+                    as: "tasks"
+                }
+            }
+        ]).exec()
 
-        res.status(200).json(project);
+        res.status(200).json(project[0]);
     } catch (error) {
         res.status(500).json({ message: "Internal server error" });
     }
@@ -89,8 +119,9 @@ export const deleteProject = async (req: Request, res: Response) => {
         }
 
         await Project.findByIdAndDelete(id);
-
+        await Task.deleteMany({ project: id });
         res.status(200).json({ message: "Project deleted successfully" });
+
     } catch (error) {
         res.status(500).json({ message: "Internal server error" });
     }
