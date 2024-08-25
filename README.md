@@ -83,6 +83,8 @@ $ git push heroku main
 $ heroku open
 ```
 
+App desplegada en: https://prueba-chatcartel-02d1d3d05894.herokuapp.com/
+
 # Interacción con API
 Los enpoints de la API pueden ser probados utilizando [colección de Postman.](https://www.postman.com/material-cosmonaut-3836233/workspace/prueba-chatcartel/collection/15323453-1a759164-3630-4832-ba05-c862c56dd1d9)
 
