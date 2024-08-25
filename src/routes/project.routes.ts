@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createProject, getProjects, updateProject, deleteProject } from "../controller/project.controller";
-import { auth } from "../../middleware/auth";
+import { auth } from "../middleware/auth";
 
 const router = Router();
 router.get("/", auth, getProjects);
