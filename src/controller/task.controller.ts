@@ -120,7 +120,7 @@ export const getTasks = async (req: Request, res: Response) => {
 export const filterTasks = async (req: Request, res: Response) => {
     try {
 
-        const { status, startDate, endDate, id, page, limit } = req.query;
+        const { status, startDate, endDate, ProjectId, page, limit } = req.query;
         const token = (req as any).token as JwtPayload;
 
         const query: any = { user: mongoose.Types.ObjectId.createFromHexString(token.id) };
@@ -137,8 +137,8 @@ export const filterTasks = async (req: Request, res: Response) => {
             query.creationDate = { $lte: new Date(endDate as string) };
         }
 
-        if (id) {
-            query.project = mongoose.Types.ObjectId.createFromHexString(id as string);
+        if (ProjectId) {
+            query.project = mongoose.Types.ObjectId.createFromHexString(ProjectId as string);
         }
 
         let tasks = await Task.aggregate([
@@ -169,3 +169,41 @@ export const filterTasks = async (req: Request, res: Response) => {
     }
 }
 
+export const reportTasks = async (req: Request, res: Response) => {
+    try {
+        const token = (req as any).token as JwtPayload;
+        const { startDate, endDate, ProjectId } = req.query;
+
+        const query: any = { user: mongoose.Types.ObjectId.createFromHexString(token.id) };
+        
+        if (startDate && endDate) {
+            query.creationDate = { $gte: new Date(startDate as string), $lte: new Date(endDate as string) };
+        } else if (startDate) {
+            query.creationDate = { $gte: new Date(startDate as string) };
+        } else if (endDate) {
+            query.creationDate = { $lte: new Date(endDate as string) };
+        }
+
+        if (ProjectId) {
+            query.project = mongoose.Types.ObjectId.createFromHexString(ProjectId as string);
+        }
+
+        const tasks = await Task.find(query);
+        const tasksByStatus = tasks.reduce((acc: any, task: any) => {
+            if (!acc[task.status]) {
+                acc[task.status] = 1;
+            } else {
+                acc[task.status] += 1;
+            }
+            return acc;
+        }, {});
+        
+        tasksByStatus.total = tasks.length;
+        tasksByStatus["porcentaje_completadas"] = ((tasksByStatus["completada"]/tasks.length)*100).toFixed(2) + "%" || "0%";
+
+        res.status(200).json(tasksByStatus);
+
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
