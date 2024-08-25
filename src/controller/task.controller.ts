@@ -28,10 +28,6 @@ export const createTask = async (req: Request, res: Response) => {
             return res.status(200).json({ message: "Task created successfully", task });
         });
 
-        // res.status(200).json({ message: "Internal server error" });
-
-        // res.status(200).json({ message: "Task created successfully" });
-
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: "Internal server error" });
@@ -79,6 +75,7 @@ export const updateTask = async (req: Request, res: Response) => {
         res.status(200).json({ message: "Task updated successfully" });
 
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: "Internal server error" });
     }
 }
@@ -88,6 +85,11 @@ export const deleteTask = async (req: Request, res: Response) => {
     const token = (req as any).token as JwtPayload;
 
     try {
+
+        if (!id) {
+            return res.status(400).json({ message: "Task id is required" });
+        }
+
         const task = await Task.findById(id);
         if (!task) {
             return res.status(404).json({ message: "Task not found" });

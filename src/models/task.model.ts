@@ -9,7 +9,7 @@ export interface ITask extends Document {
     project: string;
 }
 
-// Esquema de usuarios
+// Esquema de tareas
 const UserSchema = new Schema(
     {
         name: { type: String, required: true, minlength: 3, maxlength: 50 },

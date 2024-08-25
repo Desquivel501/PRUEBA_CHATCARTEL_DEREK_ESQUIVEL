@@ -12,7 +12,7 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
-            return res.status(401).json({ message: "Unauthorized1" });
+            return res.status(401).json({ message: "Unauthorized" });
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET as Secret);
@@ -22,7 +22,7 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
 
     } catch (error) {
         console.log(error);
-        res.status(401).json({ message: "Unauthorized2" });
+        res.status(401).json({ message: "Unauthorized" });
     }
 };
 

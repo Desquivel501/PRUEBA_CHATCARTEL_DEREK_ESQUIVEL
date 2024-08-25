@@ -33,5 +33,3 @@ app.use("/task", taskHandler);
 app.listen(Number(process.env.PORT) || 8000, '0.0.0.0', async () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
-

@@ -9,7 +9,7 @@ export const createProject = async (req: Request, res: Response) => {
     const token = (req as any).token as JwtPayload;
 
     if (!name ) {
-        return res.status(400).json({ message: "Name and description are required" });
+        return res.status(400).json({ message: "Name is required" });
     }
 
     try {
@@ -18,8 +18,6 @@ export const createProject = async (req: Request, res: Response) => {
             return res.status(200).json({ message: "Project created successfully", project });
         });
 
-        // res.status(200).json({ message: "Internal server error" });
-        
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: "Internal server error" });
@@ -49,12 +47,17 @@ export const getProjects = async (req: Request, res: Response) => {
         res.status(200).json(projects);
 
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: "Internal server error" });
     }
 }
 
 export const getProject = async (req: Request, res: Response) => {
     const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({ message: "Project id is required" });
+    }
 
     try {
         const project = await Project.aggregate([
@@ -73,6 +76,7 @@ export const getProject = async (req: Request, res: Response) => {
 
         res.status(200).json(project[0]);
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: "Internal server error" });
     }
 }
@@ -80,6 +84,10 @@ export const getProject = async (req: Request, res: Response) => {
 export const updateProject = async (req: Request, res: Response) => {
     const { id, name } = req.body;
     const token = (req as any).token as JwtPayload;
+
+    if (!id) {
+        return res.status(400).json({ message: "Project id is required" });
+    }
 
     if (!name) {
         return res.status(400).json({ message: "Name is required" });
@@ -109,6 +117,11 @@ export const deleteProject = async (req: Request, res: Response) => {
     const token = (req as any).token as JwtPayload;
 
     try {
+
+        if (!id) {
+            return res.status(400).json({ message: "Project id is required" });
+        }
+
         const project = await Project.findById(id);
         if (!project) {
             return res.status(404).json({ message: "Project not found" });
